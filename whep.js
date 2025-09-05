@@ -23,7 +23,7 @@ function negotiate() {
         });
     }).then(() => {
         var offer = pc.localDescription;
-        return fetch("http://"+host+":1985/rtc/v1/whep/?app=live&stream=livestream", {
+        return fetch(config.whepUrl+"/rtc/v1/whep/?app=live&stream=livestream", {
             body: offer.sdp,
             headers: {
                 'Content-Type': 'application/sdp'

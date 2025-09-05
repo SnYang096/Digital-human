@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WebRTC webcam</title>
+  <style>
+    button {
+      padding: 8px 16px;
+    }
+
+    video {
+      width: 100%;
+    }
+
+    .option {
+      margin-bottom: 8px;
+    }
+
+    #media {
+      max-width: 1280px;
+    }
+  </style>
+  <link rel="stylesheet" href="https://edu.hologram-box.cn/css/base.css" />
+</head>
+
+<body>
+
+  <div class="option">
+    <input id="use-stun" type="checkbox" />
+    <label for="use-stun">Use STUN server</label>
+  </div>
+  <button class="btn btn-primary" id="btn_play">Start</button>
+  <form class="form-inline" id="echo-form">
+    <div class="form-group">
+      <p>input text</p>
+
+      <textarea cols="2" rows="3" style="width:600px;height:50px;" class="form-control" id="message">test</textarea>
+    </div>
+    <button type="submit" class="btn btn-default">Send</button>
+  </form>
+  <section class="voice-box">
+    <input style="display: none" type="search" name="voice" id="voice-txt" />
+    <button id="start-btn">开始互动</button><br />
+    <div id="respTxt"></div>
+  </section>
+  <section class="fixed-box" id="fixed-box">
+    <div class="fixed-main">
+      <button class="fixed-close" id="close-btn"></button>
+      <div id="fixed-txt"> </div>
+      <div class="fixed-icon">
+        <img src="https://edu.hologram-box.cn/img/voice.png" alt="" />
+      </div>
+    </div>
+  </section>
+
+  <div id="media">
+    <h2>Media</h2>
+
+    <video id="rtc_media_player" style="width:600px;" controls autoplay></video>
+  </div>
+
+  <script src="srs.sdk.js"></script>
+  <script type="text/javascript" src="http://cdn.sockjs.org/sockjs-0.3.4.js"></script>
+  <script type="text/javascript" src="https://ajax.aspnetcdn.com/ajax/jquery/jquery-2.1.1.min.js"></script>
+  <script type="text/javascript" src="https://edu.hologram-box.cn/js/crypto-js.min.js"></script>
+  <script type="text/javascript" src="https://edu.hologram-box.cn/js/voice_t.js"></script>
+</body>
+<script type="text/javascript" charset="utf-8">
+
+  $(document).ready(function () {
+    const voiceTxt = document.querySelector("#voice-txt");
+    const startBtn = document.querySelector("#start-btn");
+    const fixedBox = document.querySelector("#fixed-box");
+    const fixedTxt = document.querySelector("#fixed-txt");
+    const closeBtn = document.querySelector("#close-btn");
+    const respTxt = document.querySelector("#respTxt");
+
+    let isListening = false; // 是否正在监听的标志
+    let isRecognized = false; // 标记识别是否完成
+    let can_speek = false; // 是否可以提问的标志
+    let can_send = true;
+    let currentIndex = 0;
+    const apiKeys = [
+        { appId: "b5de2d79", apiSecret: "MGU3ODAxNTA5ZDJjMjhmZDI3Y2JiMWE5", apiKey: "8528965af44df017d236b5f85fe03a79" },
+        { appId: "1debfd06", apiSecret: "ZmRhNDgwNTI0YjMyMmUxNmNhY2JkYTk3", apiKey: "517911a1f1d3683d4f4a30adf74f3e04" },
+        { appId: "57e09c64", apiSecret: "3c0b5d3b373c58df2f39597c2b402b11", apiKey: "fd056508b38b1e7204cef508cd62c30b" }
+    ];
+    // 实例化迅飞语音听写（流式版）WebAPI
+    const voice = new Voice({
+      appId: "b5de2d79",
+      apiSecret: "MGU3ODAxNTA5ZDJjMjhmZDI3Y2JiMWE5",
+      apiKey: "8528965af44df017d236b5f85fe03a79",
+
+
+
+      onWillStatusChange: function (oldStatus, newStatus) {
+        console.log("状态变更：", oldStatus, newStatus);
+        console.log("isListening:", isListening);  // 打印当前是否在监听
+        if(oldStatus.includes('ing')&&newStatus.includes('end')){
+          fixedBox.style.display = 'none'
+        }
+        else if(newStatus.includes('init')){
+          fixedBox.style.display = "block";
+          
+          // const currentKey=apiKeys[currentIndex];
+          // console.log("currentkey:",currentKey);
+          // this.appId=currentKey.appId;
+          // this.apiSecret=currentKey.apiSecret;
+          // this.apiKey=currentKey.apiKey;
+          // currentIndex = (currentIndex + 1) % apiKeys.length;
+        }
+        
+      },
+
+      onTextChange: function (text) {
+        if (text == '') return; // 忽略空文本
+
+        text = text.replace(/湖北|芦苇/g, "鲁北");
+        voiceTxt.value = text;
+        fixedTxt.innerText = text;
+
+
+        const myHeaders = new Headers();
+        myHeaders.append("Content-Type", "application/json");
+        let raw;
+        if (text.includes('再见') || text.includes('拜拜') || text.includes('退出') || text.includes('推出')) {
+          isListening = false;
+          raw = JSON.stringify({
+            text: text,
+            interrupt: 'true',
+            type: 'chat',
+            reply: '再见'
+          });
+        }
+        else if (text.includes('小林') || text.includes('你好')|| text.includes('您好')) {
+          can_speek = true;
+          raw = JSON.stringify({
+            text: text,
+            interrupt: 'true',
+            type: 'chat',
+            reply: '您请问'
+          });
+          can_send=true;
+        } else if(can_speek) {
+          can_speek = false;
+          const replies = [
+              '对于您的提问，根据已知信息...',
+              '感谢您的提问，基于当前数据...',
+              '根据我们的资料，回答如下...',
+              '目前我们所知道的信息是...',
+              '针对您的问题，根据已知信息',
+              '关于您的疑问，回答如下'
+          ];
+        //   const randomReply = replies[Math.floor(Math.random() * replies.length)];
+          const randomReply = '';
+          raw = JSON.stringify({
+            text: text,
+            type: 'chat',
+            reply:randomReply
+          });
+          can_send=true;
+        }else if(can_speek==false){
+          can_send=false;
+        }
+
+        const requestOptions = {
+          method: 'POST',
+          headers: myHeaders,
+          body: raw
+        };
+        voice.stop(1);
+        console.log(1111);
+        if(can_send){
+          fetch("https://u460714-823b-6edefa44.cqa1.seetacloud.com:8443/human", requestOptions);
+        }
+          
+          // .then(response => response.json())
+          // .then(data => {
+          //   isRecognized = true; // 设置识别完成标志
+          // })
+          // .finally(() => {
+          //   isRecognized = true; // 设置识别完成标志
+          //   // 自动重新启动监听
+          //   if (isListening && isRecognized) {
+          //     console.log("重新启动监听");
+          //     isRecognized = false; // 重置识别完成标志
+          //     setTimeout(() => {
+          //       voice.start();
+          //     }, 1000); // 延迟 1 秒（1000 毫秒），根据需要调整时间
+          //   }
+          // });
+
+        if (isListening) {
+          console.log("重新启动监听");
+          isRecognized = false; // 重置识别完成标志
+          setTimeout(() => {
+            voice.start();
+          }, 1000); // 延迟 1 秒（1000 毫秒），根据需要调整时间
+        }
+        if (text.includes('再见') || text.includes('拜拜') || text.includes('退出') || text.includes('推出')) {
+          isListening = false;
+
+          voice.stop(0);
+          fixedBox.style.display = "none";
+        }
+      }
+    });
+
+    // 开始监听
+    startBtn["onclick"] = function () {
+      console.log("Start button clicked");
+      if (!isListening) {
+        isListening = true;
+        console.log("Voice recognition starting...");
+        try {
+          voice.start();
+          console.log("语音识别已启动");
+        } catch (error) {
+          console.error("启动语音识别时出错:", error);
+        }
+      }
+    };
+
+    // 关闭监听
+    closeBtn["onclick"] = function () {
+      isListening = false;
+
+      voice.stop(0);
+      fixedBox.style.display = "none";
+      const myHeaders = new Headers();
+      myHeaders.append("Content-Type", "application/json");
+      let raw;
+      raw = JSON.stringify({
+        text: '',
+        interrupt: 'true',
+        type: 'chat',
+        reply: '再见'
+      });
+      const requestOptions = {
+        method: 'POST',
+        headers: myHeaders,
+        body: raw
+      };
+      fetch("https://u460714-823b-6edefa44.cqa1.seetacloud.com:8443/human", requestOptions);
+      console.log('close button');
+    };
+
+
+    $('#echo-form').on('submit', function (e) {
+      e.preventDefault();
+      var message = $('#message').val();
+      console.log('Sending: ' + message);
+      if (message.includes('小林') || message.includes('你好') || text.includes('您好')) {
+        fetch('https://u460714-823b-6edefa44.cqa1.seetacloud.com:8443/human', {
+          body: JSON.stringify({
+            text: message,
+            interrupt: 'true',
+            type: 'chat',
+            reply: '您请问'
+          }),
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          method: 'POST'
+        });
+      } 
+      else if (text.includes('再见') || text.includes('拜拜') || text.includes('退出') || text.includes('推出')) {
+        fetch('https://u460714-823b-6edefa44.cqa1.seetacloud.com:8443/human', {
+          body: JSON.stringify({
+            text: message,
+            interrupt: 'true',
+            type: 'chat',
+            reply: '再见'
+          }),
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          method: 'POST'
+        });
+      }
+      else {
+        const replies = [
+            '对于您的提问，根据已知信息...',
+            '感谢您的提问，基于当前数据...',
+            '根据我们的资料，回答如下...',
+            '目前我们所知道的信息是...',
+            '针对您的问题，根据已知信息',
+            '关于您的疑问，回答如下'
+        ];
+        const randomReply = replies[Math.floor(Math.random() * replies.length)];
+        fetch('https://u460714-823b-6edefa44.cqa1.seetacloud.com:8443/human', {
+          body: JSON.stringify({
+            text: message,
+            type: 'chat',
+            reply:randomReply
+          }),
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          method: 'POST'
+        });
+      }
+
+      //ws.send(message);
+      $('#message').val('');
+    });
+  });
+
+  $(function () {
+    var sdk = null; // Global handler to do cleanup when republishing.
+    var startPlay = function () {
+      $('#rtc_media_player').show();
+
+      // Close PC when user replay.
+      if (sdk) {
+        sdk.close();
+      }
+      sdk = new SrsRtcWhipWhepAsync();
+
+      // User should set the stream when publish is done, @see https://webrtc.org/getting-started/media-devices
+      // However SRS SDK provides a consist API like https://webrtc.org/getting-started/remote-streams
+      $('#rtc_media_player').prop('srcObject', sdk.stream);
+      // Optional callback, SDK will add track to stream.
+      // sdk.ontrack = function (event) { console.log('Got track', event); sdk.stream.addTrack(event.track); };
+
+      var host = window.location.hostname
+      // For example: webrtc://r.ossrs.net/live/livestream
+      var url = "https://srs.hologram-box.cn/rtc/v1/whep/?app=live&stream=livestream"
+      sdk.play(url).then(function (session) {
+        //$('#sessionid').html(session.sessionid);
+        //$('#simulator-drop').attr('href', session.simulator + '?drop=1&username=' + session.sessionid);
+      }).catch(function (reason) {
+        sdk.close();
+        $('#rtc_media_player').hide();
+        console.error(reason);
+      });
+    };
+
+    $('#rtc_media_player').hide();
+    // var query = parse_query_string();
+    // srs_init_whep("#txt_url", query);
+
+    $("#btn_play").click(startPlay);
+    // Never play util windows loaded @see https://github.com/ossrs/srs/issues/2732
+    // if (query.autostart === 'true') {
+    //     $('#rtc_media_player').prop('muted', true);
+    //     console.warn('For autostart, we should mute it, see https://www.jianshu.com/p/c3c6944eed5a ' +
+    //         'or https://developers.google.com/web/updates/2017/09/autoplay-policy-changes#audiovideo_elements');
+    //     window.addEventListener("load", function(){ startPlay(); });
+    // }
+  });
+
+
+</script>

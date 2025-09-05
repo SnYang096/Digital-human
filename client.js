@@ -22,7 +22,7 @@ function negotiate() {
         });
     }).then(() => {
         var offer = pc.localDescription;
-        return fetch('https://u460714-823b-6edefa44.cqa1.seetacloud.com:8443/offer', {
+        return fetch( config.baseUrl + '/offer', {
             body: JSON.stringify({
                 sdp: offer.sdp,
                 type: offer.type,
@@ -35,7 +35,6 @@ function negotiate() {
     }).then((response) => {
         return response.json();
     }).then((answer) => {
-        document.getElementById('sessionid').value = answer.sessionid
         return pc.setRemoteDescription(answer);
     }).catch((e) => {
         alert(e);
@@ -55,13 +54,12 @@ function start() {
 
     // connect audio / video
     pc.addEventListener('track', (evt) => {
-        // if (evt.track.kind == 'video') {
-        //     document.getElementById('video').srcObject = evt.streams[0];
-        // } else {
-        //     document.getElementById('audio').srcObject = evt.streams[0];
-        // }
-        document.getElementById('video').srcObject = evt.streams[0];
-
+        console.log("got remote track: ", evt.track.kind);
+        if (evt.track.kind == 'video') {
+            document.getElementById('video').srcObject = evt.streams[0];
+        } else {
+            document.getElementById('audio').srcObject = evt.streams[0];
+        }
     });
 
     document.getElementById('start').style.display = 'none';
@@ -77,23 +75,3 @@ function stop() {
         pc.close();
     }, 500);
 }
-
-window.onunload = function(event) {
-    // 在这里执行你想要的操作
-    setTimeout(() => {
-        pc.close();
-    }, 500);
-};
-
-window.onbeforeunload = function (e) {
-        setTimeout(() => {
-                pc.close();
-            }, 500);
-        e = e || window.event
-        // 兼容IE8和Firefox 4之前的版本
-        if (e) {
-          e.returnValue = '关闭提示'
-        }
-        // Chrome, Safari, Firefox 4+, Opera 12+ , IE 9+
-        return '关闭提示'
-      }
