@@ -584,18 +584,49 @@
                 
                 console.log('Sending chat message:', message);
                 
-                fetch(config.baseUrl + '/human', {
-                    body: JSON.stringify({
-                        text: message,
-                        type: 'chat',
-                        interrupt: true,
-                        sessionid: parseInt(document.getElementById('sessionid').value),
-                    }),
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    method: 'POST'
-                });
+                // fetch(config.baseUrl + '/human', {
+                //     body: JSON.stringify({
+                //         text: message,
+                //         type: 'chat',
+                //         interrupt: true,
+                //         sessionid: parseInt(document.getElementById('sessionid').value),
+                //     }),
+                //     headers: {
+                //         'Content-Type': 'application/json'
+                //     },
+                //     method: 'POST'
+                // });
+                if (message.includes('100')){
+						ans = '《环球银幕》的第100期封面人物是奥黛丽·赫本。黛丽・赫本1929年出生于比利时布鲁塞尔。1953年，她主演的《罗马假日》上映，凭借该片，她获得了第26届奥斯卡金像奖最佳女主角奖，成为驰名世界的女演员。她的代表作还有《龙凤配》《修女传》《蒂凡尼的早餐》《谜中谜》《盲女惊魂记》等。1993年1月20日，奥黛丽・赫本在瑞士洛桑病逝，享年63岁。1999年，她被美国电影学会评为“百年来最伟大的女演员”第3名。'
+						fetch(config.baseUrl + '/human', {
+						body: JSON.stringify({
+							text: ans,
+							type: 'echo',
+                            interrupt: true
+                            // ,
+							// sessionid: parseInt(document.getElementById('sessionid').value)
+						}),
+						headers: {
+							'Content-Type': 'application/json'
+						},
+						method: 'POST'
+					})
+					}
+					else {
+						fetch(config.baseUrl + '/human', {
+						body: JSON.stringify({
+							text: message,
+							type: 'chat',
+                            interrupt: true
+                            // ,
+							// sessionid: parseInt(document.getElementById('sessionid').value)
+						}),
+						headers: {
+							'Content-Type': 'application/json'
+						},
+						method: 'POST'
+					})
+					}
                 
                 addChatMessage(message, 'user');
                 $('#chat-message').val('');
